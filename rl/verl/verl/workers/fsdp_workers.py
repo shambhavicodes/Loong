@@ -60,6 +60,7 @@ def get_sharding_strategy(device_mesh):
     from torch.distributed.fsdp import ShardingStrategy
     sharding_strategy = ShardingStrategy.SHARD_GRAD_OP
     return sharding_strategy
+    ## Enable this to train a larger model
     # if device_mesh.ndim == 1:
     #     sharding_strategy = ShardingStrategy.FULL_SHARD
     # elif device_mesh.ndim == 2:

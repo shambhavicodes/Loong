@@ -77,7 +77,7 @@ Please refer to [here](rl/README.md)
 
 ### Citation
 
-If you use this codebase, or otherwise found our work valuable, please cite:
+If you use this codebase, or otherwise found our work valuable, please consider to cite:
 
 ```
 @article{wang2025m1scalabletesttimecompute,

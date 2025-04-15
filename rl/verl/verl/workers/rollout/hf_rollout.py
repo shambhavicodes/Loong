@@ -107,7 +107,6 @@ class HFRollout(BaseRollout):
         generation_config = GenerationConfig(temperature=temperature, top_p=top_p, top_k=top_k)
 
         # TODO fix the batch generation using attention mask to support left padding for hybrid models
-
         if isinstance(self.module, FSDP):
             # recurse need to set to False according to https://github.com/pytorch/pytorch/issues/100069
             param_ctx = FSDP.summon_full_params(self.module, writeback=False, recurse=False)
@@ -135,6 +134,7 @@ class HFRollout(BaseRollout):
                     seq = torch.cat([idx[:, :left_padding], seq], dim=1)
                     print("response_length:", response_length, "new_input_ids shape:", new_input_ids.shape, ", seq shape:", seq.shape)
                 else:
+                    # this is a bug since batch generation with differnt problem using left padding are not supported yet.
                     breakpoint()
 
         # huggingface generate will stop generating when all the batch reaches [EOS].
