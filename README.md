@@ -57,7 +57,7 @@ generated_text = tokenizer.batch_decode(outputs.sequences.tolist())
 print(generated_text[0])
 ```
 
-### Traning
+### Training
 
 * Initialization. Please update the model name according to your specifications.
 
