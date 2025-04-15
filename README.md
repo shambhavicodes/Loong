@@ -14,7 +14,7 @@ pip install transformers==4.47.1
 
 ### Inference
 
-```
+```python
 import torch
 from transformers import AutoTokenizer
 from mamba.hybrid_wrapper import MambaTransformerHybridModelWrapper
@@ -59,7 +59,7 @@ print(generated_text[0])
 
 ### Traning
 
-* Initialization. Please update the model name according to your specification.
+* Initialization. Please update the model name according to your specifications.
 
   `python transformer_to_mamba.py`
 
@@ -71,13 +71,13 @@ print(generated_text[0])
 
   Please refer to [here](rl/README.md)
 
-### Evalution
+### Evaluation
 
 Please refer to [here](rl/README.md)
 
 ### Citation
 
-If you use this codebase, or otherwise found our work valuable, please consider to cite:
+If you use this codebase or find our work valuable, please consider citing:
 
 ```
 @article{wang2025m1scalabletesttimecompute,
