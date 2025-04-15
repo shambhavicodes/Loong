@@ -11,7 +11,7 @@ from mamba.hybrid_model import MambaDecoderLayer, MHADecoderLayer
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Convert a pretrained model into a Mamba-optimized model for Qwen."
+        description="Convert a pretrained model into a hybrid Mamba model from a Transformer."
     )
     parser.add_argument(
         "--model_name",

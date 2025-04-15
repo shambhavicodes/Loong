@@ -116,7 +116,7 @@ def split_and_write_parallel(output, output_dir, num_parts, max_workers):
         for future in tqdm(futures, desc="Writing Data in Parallel"):
             future.result()
 
-# You need to change this accordingly for different datasets
+# You need to change this accordingly for different datasets, since different datasets have different conversation field.
 def build_conversations(dataset):
     """
     Constructs a conversation list from the dataset.
@@ -214,7 +214,7 @@ if __name__ == "__main__":
                         help="Chunksize for the process pool executor.")
     parser.add_argument("--start_pattern", type=int, nargs='+',
                         default=[78191, 128007, 271],
-                        help="Token IDs to start mask. For llama, it corresponds to Assistant>")
+                        help="Token IDs to start mask. For llama, it corresponds to <Assistant>. For deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B, you need to set this to [151645]")
     parser.add_argument("--ignore_index", type=int,
                         default=-100,
                         help="Value to use for ignored indices during label masking.")
