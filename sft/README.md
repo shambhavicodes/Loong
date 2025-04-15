@@ -4,6 +4,8 @@
 pip install flash-attn==2.7.2.post1
 pip install deepspeed==0.14.4
 pip install -e .
+pip install causal-conv1d>=1.4.0
+pip install mamba-ssm
 ```
 
 ### Usage
