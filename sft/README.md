@@ -16,17 +16,23 @@ Distillation over OpenMathInstruct
 accelerate launch -m axolotl.cli.train math_config/distill.yaml
 ```
 
+This produces a model similar to [this](https://huggingface.co/JunxiongWang/MambaInLlama3B_Distill_MATH)
+
 SFT over OpenMathInstruct
 
 ```bash
 accelerate launch -m axolotl.cli.train math_config/sft.yaml
 ```
 
+This produces a model similar to [this](https://huggingface.co/JunxiongWang/MambaInLlama3B_SFT_MATH)
+
 SFT over Reasoning
 
 ```bash
 accelerate launch -m axolotl.cli.train reason_config/sft.yaml
 ```
+
+This produces a model similar to [this](https://huggingface.co/JunxiongWang/M1-3B-SFT)
 
 If you want to build your dataset, please refer `tokenized_dataset.py`, and you need to include a README.md for metadata like [this](https://huggingface.co/datasets/JunxiongWang/R1_Sythetic_SFT/blob/main/README.md).
 

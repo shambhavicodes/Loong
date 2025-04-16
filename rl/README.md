@@ -22,7 +22,9 @@ For AIME2025 datasets, please refer to [this](https://github.com/cmu-l3/l1/blob/
 
 For other evaluation datastes, please refer to [this](https://github.com/agentica-project/rllm/blob/7d4f1e23729cd6d16eee8457dfbf2f8bc5acdf03/scripts/data/deepscaler_dataset.py).
 
-You can find our dataset [here](https://drive.google.com/drive/folders/1OgkktGEnMb_KIU_BH_7a4A3zYW42GmIW?usp=sharing)
+You can find our dataset [here](https://drive.google.com/drive/folders/1OgkktGEnMb_KIU_BH_7a4A3zYW42GmIW?usp=sharing).
+
+RL model is [here](https://huggingface.co/JunxiongWang/M1-3B)
 
 ```
 bash verl/scripts/eval.sh aime2025 JunxiongWang/M1-3B 32 1 0.7 32768
