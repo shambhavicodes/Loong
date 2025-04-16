@@ -6,7 +6,7 @@ export VLLM_ATTENTION_BACKEND=XFORMERS
 MODEL_PATH="$1"
 # Possible values: aime2025, aime, amc, math, olympiad_bench
 DATATYPES=("$2")
-OUTPUT_DIR="$1"  # Add default output directory
+OUTPUT_DIR="M1-3B/"  # Add default output directory
 
 # Echo the values for verification
 echo "Model Path: ${MODEL_PATH}"
