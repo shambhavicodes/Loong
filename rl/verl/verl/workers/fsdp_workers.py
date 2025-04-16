@@ -205,7 +205,7 @@ class ActorRolloutRefWorker(Worker):
         with init_context(), warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
-            if "mamba" in local_path.lower():
+            if "mamba" in local_path.lower() or "m1" in local_path.lower():
                 # use mamba model here
                 from verl.models.mamba.hybrid_wrapper import MambaTransformerHybridModelWrapper
                 actor_module = MambaTransformerHybridModelWrapper.from_pretrained(pretrained_model_name=local_path, torch_dtype=torch.bfloat16)
