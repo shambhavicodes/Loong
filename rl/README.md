@@ -28,8 +28,8 @@ RL model is [here](https://huggingface.co/JunxiongWang/M1-3B). Make sure you sav
 
 ```
 cd verl/
-bash scripts/eval.sh JunxiongWang/M1-3B aime2025 32 1 0.7 32768
-bash scripts/eval.sh JunxiongWang/M1-3B aime 32 1 0.7 32768
+bash scripts/eval.sh JunxiongWang/M1-3B aime2025 64 1 0.6 24576
+bash scripts/eval.sh JunxiongWang/M1-3B aime 64 1 0.6 24576
 bash scripts/eval.sh JunxiongWang/M1-3B math 32 1 0.7 32768
 bash scripts/eval.sh JunxiongWang/M1-3B olympiad_bench  32 1 0.7 32768
 ```

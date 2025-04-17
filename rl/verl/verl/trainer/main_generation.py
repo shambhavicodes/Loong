@@ -20,7 +20,6 @@ import numpy as np
 import hydra
 import os
 from tabulate import tabulate
-import torch
 
 os.environ['NCCL_DEBUG'] = 'WARN'
 os.environ['TOKENIZERS_PARALLELISM'] = 'true'
@@ -30,14 +29,11 @@ from verl.utils.model import compute_position_id_with_mask
 
 import pandas as pd
 
-from transformers import AutoTokenizer
-
 from verl import DataProto
 from verl.utils.fs import copy_local_path_from_hdfs
 from verl.workers.fsdp_workers import ActorRolloutRefWorker
 from verl.utils.hdfs_io import makedirs
 from verl.single_controller.ray import RayClassWithInitArgs, RayResourcePool, RayWorkerGroup
-import verl.utils.torch_functional as verl_F
 
 @hydra.main(config_path='config', config_name='generation', version_base=None)
 def main(config):

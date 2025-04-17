@@ -86,7 +86,7 @@ class HFRollout(BaseRollout):
                 self.config.n, dim=0)
             batch_size = batch_size * self.config.n
 
-        if not do_sample and self.config.val_kwargs.n > 1:
+        elif not do_sample and self.config.val_kwargs.n > 1:
             print("expand to n time test")
             top_k = self.config.val_kwargs.top_k
             top_p = self.config.val_kwargs.top_p
@@ -113,8 +113,8 @@ class HFRollout(BaseRollout):
         with param_ctx:
             with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
                 # For each sequence, find the index of the first non-pad token
-                # first_non_pad = (idx != pad_token_id).float().argmax(dim=1)
-                first_non_pad = (attention_mask != 0).float().argmax(dim=1)
+                first_non_pad = (idx != pad_token_id).float().argmax(dim=1)
+                # first_non_pad = (attention_mask != 0).float().argmax(dim=1)
                 # Check if all sequences have the same left padding
                 if torch.all(first_non_pad == first_non_pad[0]):
                     left_padding = first_non_pad[0].item()
