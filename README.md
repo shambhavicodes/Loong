@@ -9,7 +9,6 @@ conda activate m1
 pip install torch==2.4.0
 pip install causal-conv1d>=1.4.0
 pip install mamba-ssm
-pip install transformers==4.47.1
 ```
 
 ### Inference
