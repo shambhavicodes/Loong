@@ -38,4 +38,6 @@ If you want to build your dataset, please refer `tokenized_dataset.py`, and you 
 
 Typically, data processing requires more than 30 minutes, so you might need to increase the `ddp_timeout` setting in the YAML configuration.
 
+Check `multi_gpus/` if you want to run over multiple gpus over slurm.
+
 Most of code is copied from [here](https://github.com/axolotl-ai-cloud/axolotl)
