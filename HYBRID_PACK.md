@@ -30,5 +30,6 @@ python tests/pack_mamba/test_pack_hybrid.py
 
 You need to see `0.0` difference for those two checks.
 
-
 Those two libraries are modified from the awesome packed Mamba packages [here](https://github.com/ptxu78/pack_mamba) and [here](https://github.com/ptxu78/causal-conv1d-pack).
+
+The original [`mha.py`](https://github.com/state-spaces/mamba/blob/main/mamba_ssm/modules/mha.py) in official Mamba repository does not support `cu_seqlens`. We are able to fix this and support it in [this](rl/verl/verl/models/mamba/mha.py) and [this](rl/verl/verl/models/mamba/rotary.py)
