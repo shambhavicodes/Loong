@@ -30,3 +30,5 @@ python tests/pack_mamba/test_pack_hybrid.py
 
 You need to see `0.0` difference for those two checks.
 
+
+Those two libraries are modified from the awesome packed Mamba packages [here](https://github.com/ptxu78/pack_mamba) and [here](https://github.com/ptxu78/causal-conv1d-pack).

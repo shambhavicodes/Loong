@@ -74,7 +74,7 @@ print(generated_text[0])
 
   Please refer to [here](rl/README.md)
 
-Most training frameworks, both SFT and RL, require data packing features with `position_ids` to prevent data contamination. In our experience, using `position_ids` to prevent data contamination in SFT might not be necessary. However, to train hybrid models with RL, you must install [Packed Mamba Hybrid](HYBRID_PACK.md) and use `position_ids` to avoid the data contamination. Packing data in the same sequence without using `position_ids` will cause the RL training to fail.
+Most training frameworks, both SFT and RL, require data packing features with `position_ids` (or `cu_seqlens` in FlashAttention) to prevent data contamination. In our experience, using `position_ids` to prevent data contamination in SFT might not be necessary. However, to train hybrid models with RL, you must install [Packed Mamba Hybrid](HYBRID_PACK.md) and use `position_ids` to avoid the data contamination. Packing data in the same sequence without using `position_ids` will cause the RL training to fail.
 
 ### Evaluation
 
