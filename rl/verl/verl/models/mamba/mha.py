@@ -1,5 +1,9 @@
 # Copyright (c) 2023, Tri Dao.
 
+# This file is copied from https://github.com/Dao-AILab/flash-attention/blob/main/flash_attn/modules/mha.py.
+# However, the original implementation does not support cu_seqlens with rotary_emb_dim > 0, https://github.com/Dao-AILab/flash-attention/blob/main/flash_attn/modules/mha.py#L602-L607.
+# We have fixed this and added support for cu_seqlens with rotary_emb_dim > 0.
+
 import math
 from functools import partial
 

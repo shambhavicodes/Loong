@@ -1,5 +1,9 @@
 # Copyright (c) 2023, Tri Dao.
 
+# This file is copied from https://github.com/Dao-AILab/flash-attention/blob/main/flash_attn/layers/rotary.py.
+# However, the original implementation does not support cu_seqlens https://github.com/Dao-AILab/flash-attention/blob/main/flash_attn/layers/rotary.py#L429-L436.
+# We have fixed this and added support for cu_seqlens.
+
 import math
 from typing import Optional, Tuple, Union
 
