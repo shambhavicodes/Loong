@@ -1,4 +1,8 @@
-# M1
+# M1: Towards Scalable Test-Time Compute with Mamba Reasoning Models
+
+M1 presents a distilled hybrid architecture that achieves efficient and effective reasoning capabilities.
+
+This repository includes everything you need to **distill and create strong R1-style reasoning models** using the **hybrid Mamba architecture**. It serves as both a toolkit and a reference implementation for building lightweight, high-performance reasoning models.
 
 ### Environment Setup
 Create a new Conda environment and install the necessary dependencies:
@@ -58,17 +62,19 @@ print(generated_text[0])
 
 ### Training
 
-* Initialization. Please update the model name according to your specifications.
+* Initialization. Please update the model name according to your specifications. This repository supports any model (e.g., Llama, Qwen, R1 Distilled Qwen) available on Hugging Face.
 
   `python transformer_to_mamba.py`
 
-* Distillation + SFT
+* Distillation + SFT. For demonstration, we use [OpenMathInstruct-2](https://huggingface.co/datasets/nvidia/OpenMathInstruct-2) as the distillation dataset, which was generated from the LlaMA 405B model. If you want to perform distillation from Qwen or other models, please consider using a dataset generated from those models instead.
 
   Please refer to [here](sft/README.md)
 
-* RL
+* RL. We provide an RL training framework built on top of [VeRL](https://github.com/volcengine/verl).
 
   Please refer to [here](rl/README.md)
+
+Most training frameworks, both SFT and RL, require data packing features with `position_ids` to prevent data contamination. In our experience, using `position_ids` to prevent data contamination in SFT might not be unnecessary. However, to train hybrid models with RL, you must install [Packed Mamba Hybrid](HYBRID_PACK.md) and use `position_ids` to avoid the data contamination. Packing data in the same sequence without using `position_ids` will cause the RL training to fail.
 
 ### Evaluation
 

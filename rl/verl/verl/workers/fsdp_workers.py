@@ -58,9 +58,10 @@ def create_device_mesh(world_size, fsdp_size):
 
 def get_sharding_strategy(device_mesh):
     from torch.distributed.fsdp import ShardingStrategy
+    ## This is for a small model, please enable FULL_SHARD to train a large model.
     sharding_strategy = ShardingStrategy.SHARD_GRAD_OP
     return sharding_strategy
-    ## Enable this to train a larger model
+    # # Enable this to train a larger model
     # if device_mesh.ndim == 1:
     #     sharding_strategy = ShardingStrategy.FULL_SHARD
     # elif device_mesh.ndim == 2:
@@ -130,16 +131,18 @@ class ActorRolloutRefWorker(Worker):
                 assert self.config.actor.ppo_mini_batch_size // self.config.actor.ppo_micro_batch_size_per_gpu > 0, \
                     f'normalized ppo_mini_batch_size {self.config.actor.ppo_mini_batch_size} should be larger than ppo_micro_batch_size_per_gpu {self.config.actor.ppo_micro_batch_size_per_gpu}'
 
-        # # normalize rollout config
-        # if self._is_rollout and self.config.rollout.log_prob_micro_batch_size is not None:
-        #     self.config.rollout.log_prob_micro_batch_size //= (self.device_mesh.size() //
-        #                                                        self.ulysses_sequence_parallel_size)
-        #     self.config.rollout.log_prob_micro_batch_size_per_gpu = self.config.rollout.log_prob_micro_batch_size
-        # # normalize ref config
-        # if self._is_ref and self.config.ref.log_prob_micro_batch_size is not None:
-        #     self.config.ref.log_prob_micro_batch_size //= (self.device_mesh.size() //
-        #                                                    self.ulysses_sequence_parallel_size)
-        #     self.config.ref.log_prob_micro_batch_size_per_gpu = self.config.ref.log_prob_micro_batch_size
+        # normalize rollout config
+        if self._is_rollout and self.config.rollout.log_prob_micro_batch_size is not None:
+            self.config.rollout.log_prob_micro_batch_size //= (self.device_mesh.size() //
+                                                               self.ulysses_sequence_parallel_size)
+            self.config.rollout.log_prob_micro_batch_size_per_gpu = self.config.rollout.log_prob_micro_batch_size
+            assert self.config.ref.log_prob_micro_batch_size_per_gpu >= 1
+        # normalize ref config
+        if self._is_ref and self.config.ref.log_prob_micro_batch_size is not None:
+            self.config.ref.log_prob_micro_batch_size //= (self.device_mesh.size() //
+                                                           self.ulysses_sequence_parallel_size)
+            self.config.ref.log_prob_micro_batch_size_per_gpu = self.config.ref.log_prob_micro_batch_size
+            assert self.config.rollout.log_prob_micro_batch_size_per_gpu >= 1
 
     def _build_model_optimizer(self,
                                model_path,
@@ -259,8 +262,6 @@ class ActorRolloutRefWorker(Worker):
         if self._is_rollout and self.config.rollout.name == 'hf':
             # TODO(zhangchi.usc1992, shengguangming) fix me. Current, auto_wrap_policy causes HFRollout to hang in Gemma
             auto_wrap_policy = None
-
-        print(f'wrap_policy: {auto_wrap_policy}')
 
         fsdp_mesh = self.device_mesh
         sharding_strategy = get_sharding_strategy(fsdp_mesh)

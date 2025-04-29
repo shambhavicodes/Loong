@@ -14,7 +14,9 @@ pip install causal-conv1d>=1.4.0
 pip install mamba-ssm
 ```
 
-This is for evaluation. The training is slow because hybrid models lack features such as data packing in training and batch generation with left-padding tokens for different problems. We are working on supporting those features.
+This is for evaluation. The training is slow because hybrid models lack features such as batch generation with left-padding tokens for different problems using attention masks. We are working on supporting those features.
+
+If you want to train hybrid models using RL, you must install the hybrid mamba which support data packing. See [this](../HYBRID_PACK.md)
 
 Download datasets
 

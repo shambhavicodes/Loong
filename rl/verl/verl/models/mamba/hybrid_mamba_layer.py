@@ -141,7 +141,7 @@ class Mamba(nn.Module):
 
         self.out_proj = nn.Linear(self.d_inner, self.d_model, bias=out_proj_bias, **factory_kwargs)
 
-    def forward(self, hidden_states, inference_params=None):
+    def forward(self, hidden_states, position_ids=None, inference_params=None):
         """
         hidden_states: (B, L, D)
         Returns: same shape as hidden_states
@@ -194,9 +194,10 @@ class Mamba(nn.Module):
                 x=x,
                 weight=rearrange(self.conv1d.weight, "d 1 w -> d w"),
                 bias=self.conv1d.bias,
+                seq_pos_idx=position_ids,
                 activation=self.activation,
             )
-
+        
         if not self.repeat_kv_before_conv:
             x = rearrange(x, "b (n_group dstate) l -> b n_group l dstate", dstate=self.d_state)
             x = repeat_kv(x, self.repeat_group)
@@ -214,6 +215,7 @@ class Mamba(nn.Module):
             delta_bias=self.dt_proj.bias.float(),
             delta_softplus=True,
             return_last_state=ssm_state is not None,
+            position_indices=position_ids,
         )
         if ssm_state is not None:
             y, last_state = y
@@ -283,8 +285,6 @@ class Mamba(nn.Module):
         y = selective_state_update(
             ssm_state, x, dt, A, B, C, D, z=z, dt_bias=dt_bias, dt_softplus=True
         )
-
-        # y = y.squeeze(-1)
         y = rearrange(y, "b h d -> b (h d)")
         out = self.out_proj(y)
         

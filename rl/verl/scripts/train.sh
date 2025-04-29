@@ -64,8 +64,13 @@ python3 -m verl.trainer.main_ppo \
     +trainer.val_before_train=False \
     trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
-    trainer.save_freq=2 \
-    trainer.test_freq=2 \
+    trainer.save_freq=5 \
+    trainer.test_freq=5 \
     trainer.default_hdfs_dir=null \
     trainer.default_local_dir=${MODEL_PATH}/grpo_cg_packfix_${BSZ}_${LEN}_${CLIP}_${LR}_${EN_COEFF}_${KL_COEFF}_${TMP}_${PPO_BSZ}_new_veRL \
     trainer.total_epochs=3
+
+
+# bash scripts/train.sh /data/junxiong/Mamba-Llama-3.2-3B-R1_SFT-24576-ep5-colm-ot1m-ep5 128 32768 1 1e-6 8 0.01 0 0.9 64
+# bash scripts/train.sh /data/junxiong/Mamba-Llama-3.2-3B-R1_SFT-24576-ep5-colm-ot1m-ep5 128 28672 1 1e-6 8 0.01 0 0.9 64
+# bash scripts/train.sh /data/junxiong/Mamba-Llama-3.2-3B-R1_SFT-24576-ep5-colm-ot1m-ep5 128 28672 1 1e-6 16 0.01 0 0.9 64

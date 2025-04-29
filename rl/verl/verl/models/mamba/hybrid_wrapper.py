@@ -16,8 +16,21 @@ from verl.models.mamba.hybrid_model import MambaDecoderLayer, MHADecoderLayer
 from verl.models.mamba.util import load_safetensors_to_dict, load_state_dict_hf
 from verl.models.mamba._generation import GenerationMixin
 from collections import namedtuple
+from functools import partial
 
 MAMBA_CONFIG_NAME = "mamba_config.json"
+
+def prepare_fa2_from_position_ids(position_ids):
+    position_flatten_ids = position_ids.flatten()
+    indices_q = torch.arange(position_flatten_ids.size(0), device=position_flatten_ids.device, dtype=torch.int32)
+    cu_seq_lens = torch.cat(
+        (
+            indices_q[position_flatten_ids == 0],
+            torch.tensor(position_flatten_ids.size(), device=position_flatten_ids.device, dtype=torch.int32),
+        )
+    )
+    max_length = (position_flatten_ids.max() + 1).item()
+    return cu_seq_lens, max_length
 
 class MambaTransformerHybridModelWrapper(nn.Module, GenerationMixin):
     def __init__(
@@ -110,6 +123,15 @@ class MambaTransformerHybridModelWrapper(nn.Module, GenerationMixin):
             # we want to reuse hf features, so call hf forward to support gradient checkpoints
             # this is happen in the training
             attention_mask = mixer_kwargs.pop("attention_mask", None)
+            if position_ids is not None:
+                if position_ids.dtype == torch.int64:
+                    position_ids = position_ids.to(torch.int32)
+                cu_seqlens, max_seqlen = prepare_fa2_from_position_ids(position_ids)
+                mixer_kwargs.update({
+                    "cu_seqlens": cu_seqlens,
+                    "max_seqlen": max_seqlen,
+                })
+
             return self.model(input_ids, attention_mask, position_ids, **mixer_kwargs)
         else:
             # this if for inference

@@ -28,7 +28,7 @@ from verl.workers.actor import BasePPOActor
 from verl.utils.py_functional import append_to_dict
 from verl.utils.torch_functional import logprobs_from_logits, masked_mean
 from verl.utils.ulysses import ulysses_pad_and_slice_inputs, gather_outpus_and_unpad
-from verl.utils.seqlen_balancing import single_micro_batches, rearrange_micro_batches, get_reverse_idx
+from verl.utils.seqlen_balancing import rearrange_micro_batches, get_reverse_idx
 import verl.utils.torch_functional as verl_F
 
 from flash_attn.bert_padding import pad_input, unpad_input, rearrange, index_first_axis
@@ -80,7 +80,6 @@ class DataParallelPPOActor(BasePPOActor):
                 position_ids = position_ids.transpose(0, 1)  # (bsz, 3, seqlen) -> (3, bsz, seqlen)
 
             if self.use_remove_padding:
-                assert batch_size == 1
 
                 input_ids_rmpad, indices, *_ = unpad_input(input_ids.unsqueeze(-1),
                                                            attention_mask)  # input_ids_rmpad (total_nnz, ...)
@@ -108,17 +107,15 @@ class DataParallelPPOActor(BasePPOActor):
 
                 input_ids_rmpad_rolled = input_ids_rmpad_rolled.squeeze(0)  # ((total_nnz / sp) + pad)
 
+                print("input_ids_rmpad:", input_ids_rmpad, input_ids_rmpad.shape)
+                print("position_ids_rmpad:", position_ids_rmpad, position_ids_rmpad.shape)
+
                 # only pass input_ids and position_ids to enable flash_attn_varlen
                 output = self.actor_module(input_ids=input_ids_rmpad,
                                            attention_mask=None,
-                                           position_ids=None,
+                                           position_ids=position_ids_rmpad,
+                                           **multi_modal_inputs,
                                            use_cache=False)  # prevent model thinks we are generating
-            
-                # output = self.actor_module(input_ids=input_ids_rmpad,
-                #                            attention_mask=None,
-                #                            position_ids=position_ids_rmpad,
-                #                            **multi_modal_inputs,
-                #                            use_cache=False)  # prevent model thinks we are generating
                 
                 logits_rmpad = output.logits.squeeze(0)  # (total_nnz, vocab_size)
 
@@ -214,8 +211,7 @@ class DataParallelPPOActor(BasePPOActor):
         elif use_dynamic_bsz:
             # split using dynamic bsz
             max_token_len = data.meta_info['max_token_len'] * self.ulysses_sequence_parallel_size
-            # micro_batches, indices = rearrange_micro_batches(batch=batch, max_token_len=max_token_len)
-            micro_batches, indices = single_micro_batches(batch=batch, max_token_len=max_token_len)
+            micro_batches, indices = rearrange_micro_batches(batch=batch, max_token_len=max_token_len)
         else:
             micro_batches = batch.split(micro_batch_size)
 
@@ -269,11 +265,7 @@ class DataParallelPPOActor(BasePPOActor):
                     micro_batches = data.select(select_keys, non_tensor_select_keys).chunk(num_micro_batches)
                 elif self.config.use_dynamic_bsz:
                     max_token_len = self.config.ppo_max_token_len_per_gpu * self.ulysses_sequence_parallel_size
-                    # micro_batches, _ = rearrange_micro_batches(batch=mini_batch, max_token_len=max_token_len)
-                    # due to position ids have not been support in hybrid mamba, it can only support single sequence
-                    # todo add position ids in hyhrid mamba to fix this problem
-                    micro_batches, _ = single_micro_batches(batch=mini_batch, max_token_len=max_token_len)
-                    self.gradient_accumulation = len(micro_batches)
+                    micro_batches, _ = rearrange_micro_batches(batch=mini_batch, max_token_len=max_token_len)
                 else:
                     self.gradient_accumulation = self.config.ppo_mini_batch_size // self.config.ppo_micro_batch_size_per_gpu
                     # split batch into micro_batches

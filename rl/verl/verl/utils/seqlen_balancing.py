@@ -220,16 +220,6 @@ def log_seqlen_unbalance(seqlen_list: List[int], partitions: List[List[int]], pr
 def ceildiv(a, b):
     return -(a // -b)
 
-def single_micro_batches(batch: TensorDict, max_token_len, dp_group=None):
-    micro_bsz_idx = [[i] for i in range(len(batch))]
-    micro_batches = []
-    for partition in micro_bsz_idx:
-        curr_micro_batch = []
-        for idx in partition:
-            curr_micro_batch.append(batch[idx:idx + 1])
-        curr_micro_batch = torch.cat(curr_micro_batch)
-        micro_batches.append(curr_micro_batch)
-    return micro_batches, micro_bsz_idx
 
 def rearrange_micro_batches(batch: TensorDict, max_token_len, dp_group=None):
     """Split the batch into a list of micro_batches, where the max_token_len is smaller than max_token_len
