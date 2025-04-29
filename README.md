@@ -2,7 +2,7 @@
 
 M1 presents a distilled hybrid architecture that achieves efficient and effective reasoning capabilities.
 
-This repository includes everything you need to **distill and create strong R1-style reasoning models** using the **hybrid Mamba architecture**. It serves as both a toolkit and a reference implementation for building lightweight, high-performance reasoning models.
+This repository includes everything you need to **distill and create strong R1-style reasoning models** using the **hybrid Mamba architecture**. It serves as both a toolkit and a reference implementation for building hybrid mamba reasoning models.
 
 ### Environment Setup
 Create a new Conda environment and install the necessary dependencies:
