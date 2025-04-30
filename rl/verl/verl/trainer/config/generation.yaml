@@ -14,7 +14,8 @@ data:
 model:
   path: ~/models/Qwen2-7B-Instruct
   external_lib: null
-  mamba: True
+  mamba: False
+  mamba_inference: True
 rollout:
   name: vllm
   temperature: 1.0

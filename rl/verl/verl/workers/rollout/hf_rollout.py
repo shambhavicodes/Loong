@@ -135,7 +135,7 @@ class HFRollout(BaseRollout):
                     print("response_length:", response_length, "new_input_ids shape:", new_input_ids.shape, ", seq shape:", seq.shape)
                 else:
                     # this is a bug since batch generation with differnt problem using left padding are not supported yet.
-                    breakpoint()
+                    raise ValueError("Batch generation with different left paddings is not supported.")
 
         # huggingface generate will stop generating when all the batch reaches [EOS].
         # We have to pad to response_length

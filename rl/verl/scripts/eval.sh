@@ -27,7 +27,7 @@ for DATA_TYPE in "${DATATYPES[@]}"; do
         data.output_path=${OUTPUT_DIR}/${DATA_TYPE}_t${temperature}_n${N}_topp_${top_p}_${LEN}.parquet \
         data.batch_size=8 \
         model.path=${MODEL_PATH} \
-        model.mamba=True \
+        model.mamba_inference=True \
         rollout.name=hf \
         rollout.prompt_length=1024 \
         rollout.micro_batch_size=1 \

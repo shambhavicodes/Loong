@@ -107,9 +107,6 @@ class DataParallelPPOActor(BasePPOActor):
 
                 input_ids_rmpad_rolled = input_ids_rmpad_rolled.squeeze(0)  # ((total_nnz / sp) + pad)
 
-                print("input_ids_rmpad:", input_ids_rmpad, input_ids_rmpad.shape)
-                print("position_ids_rmpad:", position_ids_rmpad, position_ids_rmpad.shape)
-
                 # only pass input_ids and position_ids to enable flash_attn_varlen
                 output = self.actor_module(input_ids=input_ids_rmpad,
                                            attention_mask=None,
@@ -172,6 +169,7 @@ class DataParallelPPOActor(BasePPOActor):
             grad_norm = self.actor_module.clip_grad_norm_(max_norm=self.config.grad_clip)
         else:
             grad_norm = torch.nn.utils.clip_grad_norm_(self.actor_module.parameters(), max_norm=self.config.grad_clip)
+        
         self.actor_optimizer.step()
         return grad_norm
 
