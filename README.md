@@ -22,7 +22,7 @@ import torch
 from transformers import AutoTokenizer
 from mamba.hybrid_wrapper import MambaTransformerHybridModelWrapper
 
-pretrained_model_name = "JunxiongWang/M1-3B"
+pretrained_model_name = "togethercomputer/M1-3B"
 model = MambaTransformerHybridModelWrapper.from_pretrained(pretrained_model_name, torch_dtype=torch.bfloat16)
 model.eval()
 
@@ -60,6 +60,19 @@ generated_text = tokenizer.batch_decode(outputs.sequences.tolist())
 print(generated_text[0])
 ```
 
+### Evaluation
+
+Please refer to [here](rl/README.md)
+
+| **Model**                          | **AIME 2025** | **AIME 2024** | **MATH 500** | **AMC 2023** | **OlympiadBench** |
+|-----------------------------------|---------------|---------------|--------------|--------------|-------------------|
+| Qwen2.5-Math-7B-Instruct  (Transformer)        | –             | 13.3          | 79.8         | 50.6         | 40.7              |
+| rStar-Math-7B  (Transformer)                   | –             | 26.7          | 78.4         | 47.5         | 47.1              |
+| Eurus-2-7B-PRIME (Transformer)                 | –             | 26.7          | 79.2         | 57.8         | 42.1              |
+| Qwen2.5-7B-SimpleRL (Transformer)              | –             | 26.7          | 82.4         | 62.5         | 43.3              |
+| DeepSeek-R1-Distill-Qwen-1.5B (Transformer)    | 23.0          | 28.8          | 82.8         | 62.9         | 43.3              |
+| **M1-3B (Mamba Hybrid Models)**                | 23.5          | 28.5          | 84.0         | 62.8         | 47.3              |
+
 ### Training
 
 * Initialization. Please update the model name according to your specifications. This repository supports any model (e.g., Llama, Qwen, R1 Distilled Qwen) available on Hugging Face.
@@ -75,10 +88,6 @@ print(generated_text[0])
   Please refer to [here](rl/README.md)
 
 Most training frameworks, both SFT and RL, require data packing features with `position_ids` (or `cu_seqlens` in FlashAttention) to prevent data contamination. In our experience, using `position_ids` to prevent data contamination in SFT might not be necessary. However, to train hybrid models with RL, you must install [Packed Mamba Hybrid](HYBRID_PACK.md) and use `position_ids` to avoid the data contamination. Packing data in the same sequence without using `position_ids` will cause the RL training to fail.
-
-### Evaluation
-
-Please refer to [here](rl/README.md)
 
 ### Citation
 
