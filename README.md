@@ -71,7 +71,7 @@ Please refer to [here](rl/README.md)
 | Eurus-2-7B-PRIME (Transformer)                 | –             | 26.7          | 79.2         | 57.8         | 42.1              |
 | Qwen2.5-7B-SimpleRL (Transformer)              | –             | 26.7          | 82.4         | 62.5         | 43.3              |
 | DeepSeek-R1-Distill-Qwen-1.5B (Transformer)    | 23.0          | 28.8          | 82.8         | 62.9         | 43.3              |
-| **M1-3B (Mamba Hybrid Models)**                | 23.5          | 28.5          | 84.0         | 62.8         | 47.3              |
+| [**M1-3B (Mamba Hybrid Models)**](https://huggingface.co/togethercomputer/M1-3B)                | 23.5          | 28.5          | 84.0         | 62.8         | 47.3              |
 
 ### Training
 
