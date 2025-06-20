@@ -16,7 +16,7 @@ pip install vllm==0.6.3.post1
 pip install mamba-ssm
 ```
 
-### Batch Inference
+### Variable Length Batch Inference with CudaGraph enable
 
 ```python
 import torch
