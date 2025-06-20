@@ -99,11 +99,15 @@ outputs = model.generate(
 
 generated_text = tokenizer.batch_decode(outputs.sequences.tolist())
 print(generated_text[0])
+print(generated_text[1])
+print(generated_text[2])
+print(generated_text[3])
 ```
 
 Test:
 
 ```
+python test_batch_generation/generation_example.py
 python test_batch_generation/test_variable_decode.py
 ```
 
