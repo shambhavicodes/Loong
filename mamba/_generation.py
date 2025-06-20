@@ -122,6 +122,7 @@ def sample(logits, top_k=1, top_p=0.0, min_p=0.0, temperature=1.0):
             # Clone so that when we modify for top_p we don't change the original logits
             logits_top = logits / temperature if temperature != 1.0 else logits.clone()
             modify_logits_for_top_p_filtering(logits_top, top_p)
+            logits_top = torch.nan_to_num(logits_top, nan=-1e9, posinf=-1e9, neginf=-1e9)
             probs = torch.softmax(logits_top, dim=-1)
             safe_probs = torch.maximum(probs, torch.zeros_like(probs))
             return torch.multinomial(
@@ -173,18 +174,19 @@ def decode(
     if cg:
         if not hasattr(model, "_decoding_cache"):
             model._decoding_cache = None
+        
         model._decoding_cache = update_graph_cache(
             model,
             model._decoding_cache,
             batch_size,
             seqlen_og,
             max_length,
-            dtype=torch.bfloat16,
+            dtype=model.dtype,
         )
         inference_params = model._decoding_cache.inference_params
         inference_params.reset(max_length, batch_size)
     else:
-        inf_cache = model.allocate_inference_cache(batch_size, max_length, dtype=torch.bfloat16)
+        inf_cache = model.allocate_inference_cache(batch_size, max_length, dtype=model.dtype)
         inference_params = InferenceParams(
             max_seqlen=max_length, 
             max_batch_size=batch_size,
@@ -274,11 +276,6 @@ def decode(
         torch.cuda.synchronize()
         print(f"Prompt processing + decoding time: {(start.elapsed_time(end)):.0f}ms")
     
-    if cg:
-        # reset decoding cache
-        if hasattr(model, "_decoding_cache"):
-            model._decoding_cache = None
-    
     output_cls = (
         GreedySearchDecoderOnlyOutput if top_k == 1 else SampleDecoderOnlyOutput
     )
@@ -363,15 +360,15 @@ def update_graph_cache(
             model, "allocate_inference_cache"
         ), "CUDA graph decoding requires that the model has a method allocate_inference_cache"
         inf_cache = model.allocate_inference_cache(batch_size, max_seqlen, dtype)
-        lengths_per_sample = torch.full(
-            (batch_size,), seqlen_og, dtype=torch.int32, device=device
-        )
+        # lengths_per_sample = torch.full(
+        #     (batch_size,), seqlen_og, dtype=torch.int32, device=device
+        # )
         cache.inference_params = InferenceParams(
             max_seqlen=max_seqlen,
             max_batch_size=batch_size,
             seqlen_offset=seqlen_og,
             key_value_memory_dict=inf_cache,
-            lengths_per_sample=lengths_per_sample,
+            # lengths_per_sample=lengths_per_sample,
         )
         cache.mempool = torch.cuda.graphs.graph_pool_handle()
     for decoding_seqlen in decoding_seqlens:
@@ -415,7 +412,7 @@ def capture_graph(
     )
     seqlen_offset_og = inference_params.seqlen_offset
     inference_params.seqlen_offset = max_seqlen - decoding_seqlen
-    inference_params.lengths_per_sample[:] = inference_params.seqlen_offset
+    # inference_params.lengths_per_sample[:] = inference_params.seqlen_offset
 
     # Warmup before capture
     s = torch.cuda.Stream()
@@ -432,7 +429,7 @@ def capture_graph(
         # This might be needed for correctness if we run with NCCL_GRAPH_MIXING_SUPPORT=0,
         # which requires that graph launch and non-captured launch to not overlap (I think,
         # that's how I interpret the documentation). I'm not sure if this is required.
-        # this will cause a error/hange in openr1 rl training
+        # this will cause a error in rl training
         # if torch.distributed.is_initialized():
         #     torch.distributed.barrier()
     torch.cuda.current_stream().wait_stream(s)
@@ -448,7 +445,7 @@ def capture_graph(
         ).logits
 
     def run(new_input_ids, new_position_ids, seqlen):
-        inference_params.lengths_per_sample[:] = seqlen
+        # inference_params.lengths_per_sample[:] = seqlen
         input_ids.copy_(new_input_ids)
         position_ids.copy_(new_position_ids)
         graph.replay()
