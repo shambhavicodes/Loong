@@ -12,6 +12,7 @@ pip install -e .
 pip install -r deepscaler-requirements.txt
 pip install causal-conv1d>=1.4.0
 pip install mamba-ssm
+pip install vllm==0.6.3.post1
 ```
 
 This is for evaluation. The training is slow because hybrid models lack features such as batch generation with left-padding tokens for different problems using attention masks. We are working on supporting those features.
@@ -28,14 +29,14 @@ For other evaluation datastes, please refer to [this](https://github.com/agentic
 
 You can find our dataset [here](https://drive.google.com/drive/folders/1OgkktGEnMb_KIU_BH_7a4A3zYW42GmIW?usp=sharing).
 
-RL model is [here](https://huggingface.co/JunxiongWang/M1-3B). Make sure you save your data under `rl/verl/data/`
+RL model is [here](https://huggingface.co/togethercomputer/M1-3B). Make sure you save your data under `rl/verl/data/`
 
 ```
 cd verl/
-bash scripts/eval.sh JunxiongWang/M1-3B aime2025 64 1 0.6 24576
-bash scripts/eval.sh JunxiongWang/M1-3B aime 64 1 0.6 24576
-bash scripts/eval.sh JunxiongWang/M1-3B math 32 1 0.7 32768
-bash scripts/eval.sh JunxiongWang/M1-3B olympiad_bench  32 1 0.7 32768
+bash scripts/eval.sh togethercomputer/M1-3B aime2025 16 1 0.7 24576
+bash scripts/eval.sh togethercomputer/M1-3B aime 16 1 0.7 24576
+bash scripts/eval.sh togethercomputer/M1-3B math 16 1 0.7 32768
+bash scripts/eval.sh togethercomputer/M1-3B olympiad_bench  16 1 0.7 32768
 ```
 
 Most of code is copied from [here](https://github.com/volcengine/verl)

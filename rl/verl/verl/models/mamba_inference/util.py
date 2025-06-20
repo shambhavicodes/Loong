@@ -49,7 +49,7 @@ def construct_layer_dict(safetensors_dict, num_hidden_layers):
 
 def load_state_dict_hf(model_name, device=None, dtype=None):
     # Determine the appropriate device for loading
-    mapped_device = "cpu" if dtype not in [torch.float32, None] else device
+    mapped_device = "cpu"
 
     # Check if safetensors is available
     if is_safetensors_available():

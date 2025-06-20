@@ -101,6 +101,12 @@ generated_text = tokenizer.batch_decode(outputs.sequences.tolist())
 print(generated_text[0])
 ```
 
+Test:
+
+```
+python test_batch_generation/test_variable_decode.py
+```
+
 ### Evaluation
 
 Please refer to [here](rl/README.md)

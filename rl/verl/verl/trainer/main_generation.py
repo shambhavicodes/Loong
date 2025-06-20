@@ -92,24 +92,6 @@ def main(config):
                                                  tokenize=True)
             input_ids = inputs['input_ids']
             attention_mask = inputs['attention_mask']
-
-            # input_ids_list = []
-            # attention_mask_list = []
-            # for chat in batch_chat_lst:
-            #     prompt_with_chat_template = tokenizer.apply_chat_template(chat, add_generation_prompt=True, tokenize=False)
-            #     input_ids, attention_mask = verl_F.tokenize_and_postprocess_data(prompt=prompt_with_chat_template,
-            #                                                             tokenizer=tokenizer,
-            #                                                             max_length=config.rollout.prompt_length,
-            #                                                             pad_token_id=tokenizer.pad_token_id,
-            #                                                             left_pad=True,
-            #                                                             truncation="error")
-            #
-            #     input_ids_list.append(input_ids)
-            #     attention_mask_list.append(attention_mask)
-
-            # input_ids = torch.concat(input_ids_list, dim=0)
-            # attention_mask = torch.concat(attention_mask_list, dim=0)
-
             position_ids = compute_position_id_with_mask(attention_mask)
 
             batch_dict = {'input_ids': input_ids, 'attention_mask': attention_mask, 'position_ids': position_ids}

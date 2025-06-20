@@ -41,9 +41,7 @@ class HFRollout(BaseRollout):
 
     def generate_sequences(self, prompts: DataProto) -> DataProto:
         batch_size = prompts.batch.batch_size[0]
-        # TODO fix this for batch generation with left padding tokens and support attention mask.
-        # num_chunks = max(batch_size // self.config.get('micro_batch_size', batch_size), 1)
-        num_chunks = self.config.get('micro_batch_size', batch_size)
+        num_chunks = max(batch_size // self.config.get('micro_batch_size', batch_size), 1)
         batch_prompts = prompts.chunk(chunks=num_chunks)
         output = [self._generate_minibatch(p) for p in batch_prompts]
         output = DataProto.concat(output)
@@ -69,12 +67,9 @@ class HFRollout(BaseRollout):
         do_sample = prompts.meta_info.get('do_sample', self.config.do_sample)
         response_length = prompts.meta_info.get('response_length', self.config.response_length)
         top_p = prompts.meta_info.get('top_p', self.config.get('top_p', 1.0))
-        top_k = prompts.meta_info.get('top_k', self.config.get('top_k', 0))
+        top_k = prompts.meta_info.get('top_k', self.config.get('top_k', -1))
 
         temperature = prompts.meta_info.get('temperature', self.config.temperature)
-
-        print("config.n:", self.config.n)
-        print("do_sample:", do_sample)
 
         # Handle multiple samples per prompt
         if do_sample and self.config.n > 1:
@@ -97,47 +92,32 @@ class HFRollout(BaseRollout):
             position_ids = position_ids.repeat_interleave(
                 self.config.val_kwargs.n, dim=0)
             batch_size = batch_size * self.config.val_kwargs.n
-            
-        print("idx:", idx.shape)
 
-        if top_k is None:
-            # for mamba
-            top_k = -1
-
+        top_k = -1 if top_k is None else top_k
         generation_config = GenerationConfig(temperature=temperature, top_p=top_p, top_k=top_k)
 
-        # TODO fix the batch generation using attention mask to support left padding for hybrid models
+        print("idx:", idx.shape, generation_config)
+        print("pad_token_id:", pad_token_id)
+
         if isinstance(self.module, FSDP):
             # recurse need to set to False according to https://github.com/pytorch/pytorch/issues/100069
             param_ctx = FSDP.summon_full_params(self.module, writeback=False, recurse=False)
+        
         with param_ctx:
             with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
-                # For each sequence, find the index of the first non-pad token
-                first_non_pad = (idx != pad_token_id).float().argmax(dim=1)
-                # first_non_pad = (attention_mask != 0).float().argmax(dim=1)
-                # Check if all sequences have the same left padding
-                if torch.all(first_non_pad == first_non_pad[0]):
-                    left_padding = first_non_pad[0].item()
-                    new_input_ids = idx[:, left_padding:]
-                    output = self.module.generate(
-                        input_ids=new_input_ids,
-                        attention_mask=attention_mask,
-                        do_sample=do_sample,
-                        max_new_tokens=response_length,
-                        eos_token_id=eos_token_id,
-                        pad_token_id=pad_token_id,
-                        generation_config=generation_config,
-                        output_scores=False,  # this is potentially very large
-                        return_dict_in_generate=True,
-                        use_cache=True)
-                    seq = output.sequences
-                    seq = torch.cat([idx[:, :left_padding], seq], dim=1)
-                    print("response_length:", response_length, "new_input_ids shape:", new_input_ids.shape, ", seq shape:", seq.shape)
-                else:
-                    # this is a bug since batch generation with differnt problem using left padding are not supported yet.
-                    raise ValueError("Batch generation with different left paddings is not supported.")
-
-        # huggingface generate will stop generating when all the batch reaches [EOS].
+                output = self.module.generate(
+                    input_ids=idx,
+                    attention_mask=attention_mask,
+                    do_sample=do_sample,
+                    max_new_tokens=response_length,
+                    eos_token_id=eos_token_id,
+                    pad_token_id=pad_token_id,
+                    generation_config=generation_config,
+                    output_scores=False,
+                    return_dict_in_generate=True
+                )
+                seq = output.sequences
+        
         # We have to pad to response_length
         sequence_length = prompt_length + self.config.response_length
         delta_length = sequence_length - seq.shape[1]

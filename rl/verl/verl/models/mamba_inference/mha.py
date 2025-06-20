@@ -9,12 +9,14 @@ from functools import partial
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from einops import rearrange, repeat
 
+from flash_attn.bert_padding import unpad_input, pad_input
 from flash_attn.utils.distributed import get_dim_for_local_rank
-
 try:
     from flash_attn import (
+        flash_attn_func,
         flash_attn_kvpacked_func,
         flash_attn_qkvpacked_func,
         flash_attn_varlen_kvpacked_func,
@@ -553,7 +555,61 @@ class MHA(nn.Module):
         )
         return context
 
-    def _update_kvcache_attention(self, q, kv, inference_params):
+    def _update_kv_cache_pack(self, kv, cu_seqlens_kv, inference_params):
+        num_heads, head_dim = kv.shape[-2:]
+        if self.layer_idx not in inference_params.key_value_memory_dict:
+            kv_cache = torch.empty(
+                inference_params.max_batch_size,
+                inference_params.max_seqlen,
+                2,
+                num_heads,
+                head_dim,
+                dtype=kv.dtype,
+                device=kv.device,
+            )
+            inference_params.key_value_memory_dict[self.layer_idx] = kv_cache
+        else:
+            kv_cache = inference_params.key_value_memory_dict[self.layer_idx]
+        
+        # B = cu_seqlens_kv.shape[0] - 1
+        # for i in range(B):
+        #     start = cu_seqlens_kv[i].item()
+        #     end = cu_seqlens_kv[i + 1].item()
+        #     seq_len = end - start
+        #     kv_cache[i, :seq_len] = kv[start:end]
+
+        B = cu_seqlens_kv.shape[0] - 1
+        seq_lens = cu_seqlens_kv[1:] - cu_seqlens_kv[:-1]
+        max_len = seq_lens.max().item()
+        positions = torch.arange(max_len, device=kv.device).unsqueeze(0)
+        offsets = cu_seqlens_kv[:-1] 
+        idx = offsets.unsqueeze(1) + positions
+        mask = positions < seq_lens.unsqueeze(1)
+        idx[~mask] = 0
+        kv_selected = kv[idx] 
+        trailing_dims = kv_selected.dim() - 2
+        mask_expanded = mask.view(B, max_len, *([1] * trailing_dims))
+        kv_selected = kv_selected * mask_expanded
+        kv_cache[:, :max_len] = kv_selected
+    
+    def _update_kvcache_attention_with_cu_seqlens(self, q, kv, inference_params, **kwargs):
+        cu_seqlens = kwargs["cu_seqlens"]
+        max_seqlen = kwargs["max_seqlen"]
+        self._update_kv_cache_pack(kv, cu_seqlens, inference_params)
+        attn_output = flash_attn_varlen_kvpacked_func(
+            q, kv,
+            cu_seqlens, cu_seqlens,
+            max_seqlen, max_seqlen,
+            dropout_p=self.inner_cross_attn.drop.p if self.training else 0.0,
+            softmax_scale=self.inner_cross_attn.softmax_scale,
+            causal=self.causal,
+            alibi_slopes=self.inner_cross_attn.alibi_slopes,
+            window_size=self.inner_cross_attn.window_size,
+            deterministic=self.inner_cross_attn.deterministic,
+        )
+        return attn_output
+
+    def _update_kvcache_attention(self, q, kv, inference_params, **kwargs):
         """Write kv to inference_params, then do attention"""
         if (
             inference_params.seqlen_offset == 0
@@ -562,7 +618,7 @@ class MHA(nn.Module):
         ):
             # TODO: this only uses seqlen_offset and not lengths_per_sample.
             kv = self._update_kv_cache(kv, inference_params)
-            return self.inner_cross_attn(q, kv)
+            return self.inner_cross_attn(q, kv, **kwargs)
         else:
             batch = q.shape[0]
             kv_cache = inference_params.key_value_memory_dict[self.layer_idx][:batch]
@@ -622,10 +678,10 @@ class MHA(nn.Module):
         if key_padding_mask is not None:
             assert cu_seqlens is None
             assert max_seqlen is None
-            assert not self.use_flash_attn
+            # assert not self.use_flash_attn
         if inference_params is not None:
-            assert key_padding_mask is None
-            assert cu_seqlens is None and max_seqlen is None
+            # assert key_padding_mask is None
+            # assert cu_seqlens is None and max_seqlen is None
             assert not self.dwconv
         
         kwargs = (
@@ -716,6 +772,14 @@ class MHA(nn.Module):
                     q, kv = self.rotary_emb(
                         q, kv, seqlen_offset=seqlen_offset, cu_seqlens=cu_seqlens, max_seqlen=rotary_max_seqlen,
                     )
+                
+                # dtype = q.dtype
+                # if dtype == torch.float32:
+                #     # q = q.to(torch.bfloat16)
+                #     # kv = kv.to(torch.bfloat16)
+                #     q = q.to(torch.float16)
+                #     kv = kv.to(torch.float16)
+
                 if inference_params is None:
                     if not self.checkpointing:
                         context = self.inner_cross_attn(q, kv, **kwargs)
@@ -723,10 +787,28 @@ class MHA(nn.Module):
                         context = torch.utils.checkpoint.checkpoint(
                             self.inner_cross_attn, q, kv, **kwargs
                         )
+                elif inference_params.seqlen_offset == 0 and cu_seqlens is not None:
+                    context = self._update_kvcache_attention_with_cu_seqlens(
+                        q, kv, inference_params, **kwargs
+                    )
                 else:
-                    context = self._update_kvcache_attention(q, kv, inference_params)
+                    context = self._update_kvcache_attention(q, kv, inference_params, **kwargs)
+
+                # context = context.to(dtype)
+
             else:
+
+                # dtype = q.dtype
+                # if dtype == torch.float32:
+                #     # q = q.to(torch.bfloat16)
+                #     # kv = kv.to(torch.bfloat16)
+                #     q = q.to(torch.float16)
+                #     kv = kv.to(torch.float16)
+
                 context = self._apply_rotary_update_kvcache_attention(q, kv, inference_params)
+
+                # context = context.to(dtype)
+
         out = self.out_proj(rearrange(context, "... h d -> ... (h d)"))
         return out if not self.return_residual else (out, x)
 

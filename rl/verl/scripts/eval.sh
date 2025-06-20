@@ -23,14 +23,14 @@ for DATA_TYPE in "${DATATYPES[@]}"; do
     python3 -m verl.trainer.main_generation \
         trainer.nnodes=1 \
         trainer.n_gpus_per_node=8 \
-        data.path=data/${DATA_TYPE}.parquet \
+        data.path=/home/junxiong/M1/rl/verl/data/${DATA_TYPE}.parquet \
         data.output_path=${OUTPUT_DIR}/${DATA_TYPE}_t${temperature}_n${N}_topp_${top_p}_${LEN}.parquet \
-        data.batch_size=8 \
+        data.batch_size=32 \
         model.path=${MODEL_PATH} \
         model.mamba_inference=True \
         rollout.name=hf \
         rollout.prompt_length=1024 \
-        rollout.micro_batch_size=1 \
+        rollout.micro_batch_size=4 \
         rollout.n=${N} \
         rollout.do_sample=True \
         rollout.temperature=${temperature} \
