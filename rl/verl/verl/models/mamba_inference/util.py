@@ -24,11 +24,7 @@ def load_safetensors_to_dict(directory):
             file_path = os.path.join(directory, filename)
             with safe_open(file_path, framework="pt") as f:
                 for key in f.keys():
-                    if "grpo" in file_path.lower():
-                        safetensors_dict[key.replace("model.model.", "model.").replace("model.lm_head", "lm_head")] = f.get_tensor(key)
-                    else:
-                        safetensors_dict[key] = f.get_tensor(key)
-                    # safetensors_dict[key] = f.get_tensor(key)
+                    safetensors_dict[key] = f.get_tensor(key)
     return safetensors_dict
 
 def construct_layer_dict(safetensors_dict, num_hidden_layers):

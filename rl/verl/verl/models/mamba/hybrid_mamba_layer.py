@@ -6,7 +6,10 @@ import torch.nn.functional as F
 
 from einops import rearrange, repeat
 
-from mamba_ssm.ops.selective_scan_interface import selective_scan_fn, mamba_inner_fn
+from mamba_ssm.ops.selective_scan_interface import selective_scan_fn
+
+from vllm.model_executor.layers.mamba.ops.mamba_ssm import selective_scan_fn as varlen_selective_scan_fn
+from vllm.model_executor.layers.mamba.ops.causal_conv1d import causal_conv1d_fn as varlen_causal_conv1d_fn
 
 try:
     from causal_conv1d import causal_conv1d_fn, causal_conv1d_update
@@ -141,7 +144,7 @@ class Mamba(nn.Module):
 
         self.out_proj = nn.Linear(self.d_inner, self.d_model, bias=out_proj_bias, **factory_kwargs)
 
-    def forward(self, hidden_states, position_ids=None, inference_params=None):
+    def forward(self, hidden_states, position_ids=None, cu_seqlens=None, seq_idx=None, inference_params=None):
         """
         hidden_states: (B, L, D)
         Returns: same shape as hidden_states
@@ -150,6 +153,7 @@ class Mamba(nn.Module):
 
         conv_state, ssm_state = None, None
         if inference_params is not None:
+            batch = cu_seqlens.shape[0] - 1 if cu_seqlens is not None else batch
             conv_state, ssm_state = self._get_states_from_cache(inference_params, batch)
             if inference_params.seqlen_offset > 0:
                 # The states are updated inplace
@@ -175,55 +179,92 @@ class Mamba(nn.Module):
         dt = rearrange(dt, "b l d -> b d l")  # B, d_inner, L
 
         if self.repeat_kv_before_conv:
-            # b d l
             x = rearrange(x, "b (n_group dstate) l -> b n_group l dstate", dstate=self.d_state)
             x = repeat_kv(x, self.repeat_group)
             x = rearrange(x, "b n_group l dstate -> b (n_group dstate) l")
 
-        # Compute short convolution
-        if conv_state is not None:
-            # If we just take x[:, :, -self.d_conv :], it will error if seqlen < self.d_conv
-            # Instead F.pad will pad with zeros if seqlen < self.d_conv, and truncate otherwise.
-            # Update state (B D W)
-            conv_state.copy_(F.pad(x, (self.d_conv - x.shape[-1], 0)))
-        if causal_conv1d_fn is None:
-            x = self.act(self.conv1d(x)[..., :seqlen])
-        else:
-            assert self.activation in ["silu", "swish"]
-            x = causal_conv1d_fn(
-                x=x,
+        if cu_seqlens is not None and inference_params is not None:
+            # variable length path
+            x = varlen_causal_conv1d_fn(
+                x.squeeze(0) if cu_seqlens is not None else x,  # Add batch dimension
                 weight=rearrange(self.conv1d.weight, "d 1 w -> d w"),
                 bias=self.conv1d.bias,
-                seq_pos_idx=position_ids,
                 activation=self.activation,
+                conv_states=conv_state,
+                query_start_loc=cu_seqlens
             )
-        
+            x = x.unsqueeze(0) if cu_seqlens is not None else x
+        else:
+            # Compute short convolution
+            if conv_state is not None:
+                # If we just take x[:, :, -self.d_conv :], it will error if seqlen < self.d_conv
+                # Instead F.pad will pad with zeros if seqlen < self.d_conv, and truncate otherwise.
+                # Update state (B D W)
+                conv_state.copy_(F.pad(x, (self.d_conv - x.shape[-1], 0)))
+            # if causal_conv1d_fn is None:
+                # x = self.act(self.conv1d(x)[..., :seqlen])
+            assert causal_conv1d_fn is not None
+            if cu_seqlens is not None:
+                x = causal_conv1d_fn(
+                    x=x.transpose(1,2).contiguous().transpose(1,2) if cu_seqlens is not None else x,
+                    weight=rearrange(self.conv1d.weight, "d 1 w -> d w"),
+                    bias=self.conv1d.bias,
+                    seq_idx=seq_idx,
+                    activation=self.activation,
+                )
+            else:
+                assert self.activation in ["silu", "swish"]
+                x = causal_conv1d_fn(
+                    x=x,
+                    weight=rearrange(self.conv1d.weight, "d 1 w -> d w"),
+                    bias=self.conv1d.bias,
+                    activation=self.activation,
+                )
+
         if not self.repeat_kv_before_conv:
             x = rearrange(x, "b (n_group dstate) l -> b n_group l dstate", dstate=self.d_state)
             x = repeat_kv(x, self.repeat_group)
             x = rearrange(x, "b n_group l dstate -> b (n_group dstate) l")
 
-        assert self.activation in ["silu", "swish"]
-        y = selective_scan_fn(
-            x,
-            dt,
-            A,
-            B,
-            C,
-            self.D.float(),
-            z=z,
-            delta_bias=self.dt_proj.bias.float(),
-            delta_softplus=True,
-            return_last_state=ssm_state is not None,
-            position_indices=position_ids,
-        )
-        if ssm_state is not None:
-            y, last_state = y
-            # ssm_state.copy_(last_state.unsqueeze(-2))
-            ssm_state.copy_(rearrange(last_state, "b (h d) n -> b h d n", h=self.num_C_head))
+        if cu_seqlens is not None and inference_params is not None:
+            # use variable length decoding
+            y = varlen_selective_scan_fn(
+                x.squeeze(0),
+                ssm_state,
+                dt.squeeze(0),
+                A,
+                B.squeeze(0),
+                C.squeeze(0),
+                self.D.float(),
+                z=z.squeeze(0),
+                delta_bias=self.dt_proj.bias.float(),
+                delta_softplus=True,
+                query_start_loc=cu_seqlens,
+            )
+            y = y.unsqueeze(0)
+        else:
+            # use variable length kernel which supports training
+            position_indices = position_ids if cu_seqlens is not None else None
+            y = selective_scan_fn(
+                x,
+                dt,
+                A,
+                B,
+                C,
+                self.D.float(),
+                z=z,
+                delta_bias=self.dt_proj.bias.float(),
+                delta_softplus=True,
+                return_last_state=ssm_state is not None,
+                position_indices=position_indices,
+            )
+
+            if ssm_state is not None:
+                y, last_state = y
+                ssm_state.copy_(rearrange(last_state, "b (h d) n -> b h d n", h=self.num_C_head))
+
         y = rearrange(y, "b d l -> b l d")
         out = self.out_proj(y)
-
         return out
 
     def step(self, hidden_states, conv_state, ssm_state):
@@ -330,7 +371,6 @@ class Mamba(nn.Module):
                 self.d_state,
                 device=self.dt_proj.weight.device,
                 dtype=self.dt_proj.weight.dtype,
-                # dtype=torch.float32,
             )
             inference_params.key_value_memory_dict[self.layer_idx] = (conv_state, ssm_state)
         else:

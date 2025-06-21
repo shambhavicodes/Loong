@@ -1,6 +1,6 @@
 import torch
-from verl.models.mamba_varlen.hybrid_wrapper import MambaTransformerHybridModelWrapper
-from verl.models.mamba_varlen._generation import InferenceParams
+from mamba.hybrid_wrapper import MambaTransformerHybridModelWrapper
+from mamba._generation import InferenceParams
 from transformers import AutoTokenizer
 
 import random
@@ -157,4 +157,3 @@ with torch.no_grad():
     print(f"Max Conv cache difference 2: {max_conv_diff2:.6f}")
     print(f"Max Conv cache difference 3: {max_conv_diff3:.6f}")
     print(f"Max Conv cache difference 4: {max_conv_diff4:.6f}")
-

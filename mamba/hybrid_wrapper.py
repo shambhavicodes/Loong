@@ -258,7 +258,6 @@ class MambaTransformerHybridModelWrapper(nn.Module, GenerationMixin):
                 )
 
             if inference_params.seqlen_offset > 0:
-                #   and cu_seqlens is not None:
                 inference_params.lengths_per_sample += 1
 
             lm_logits = self.model.lm_head(hidden_states)

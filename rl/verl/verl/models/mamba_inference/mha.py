@@ -772,14 +772,6 @@ class MHA(nn.Module):
                     q, kv = self.rotary_emb(
                         q, kv, seqlen_offset=seqlen_offset, cu_seqlens=cu_seqlens, max_seqlen=rotary_max_seqlen,
                     )
-                
-                # dtype = q.dtype
-                # if dtype == torch.float32:
-                #     # q = q.to(torch.bfloat16)
-                #     # kv = kv.to(torch.bfloat16)
-                #     q = q.to(torch.float16)
-                #     kv = kv.to(torch.float16)
-
                 if inference_params is None:
                     if not self.checkpointing:
                         context = self.inner_cross_attn(q, kv, **kwargs)
@@ -793,22 +785,8 @@ class MHA(nn.Module):
                     )
                 else:
                     context = self._update_kvcache_attention(q, kv, inference_params, **kwargs)
-
-                # context = context.to(dtype)
-
             else:
-
-                # dtype = q.dtype
-                # if dtype == torch.float32:
-                #     # q = q.to(torch.bfloat16)
-                #     # kv = kv.to(torch.bfloat16)
-                #     q = q.to(torch.float16)
-                #     kv = kv.to(torch.float16)
-
                 context = self._apply_rotary_update_kvcache_attention(q, kv, inference_params)
-
-                # context = context.to(dtype)
-
         out = self.out_proj(rearrange(context, "... h d -> ... (h d)"))
         return out if not self.return_residual else (out, x)
 

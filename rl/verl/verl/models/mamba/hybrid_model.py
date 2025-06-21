@@ -1,16 +1,15 @@
-from mamba_ssm.ops.triton.layer_norm import RMSNorm
 from torch import Tensor
-from transformers.activations import ACT2FN
+import torch.nn as nn
 
 from verl.models.mamba.hybrid_mamba_config import MambaConfig
 from verl.models.mamba.hybrid_mamba_layer import Mamba
 from verl.models.mamba.mha import MHA
 
-
-import torch.nn as nn
+from mamba_ssm.ops.triton.layer_norm import RMSNorm
+from transformers.activations import ACT2FN
 
 class MLP(nn.Module):
-    def __init__(self, d_model, intermediate_size, hidden_act, device=None, dtype=None,):
+    def __init__(self, d_model, intermediate_size, hidden_act, device=None, dtype=None):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
         self.hidden_size = d_model
@@ -50,23 +49,22 @@ class MHADecoderLayer(nn.Module):
         self.mlp = MLP(config.hidden_size, config.intermediate_size, config.hidden_act, **factory_kwargs)
         self.input_layernorm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps, **factory_kwargs)
         self.post_attention_layernorm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps, **factory_kwargs)
-        self.residual_in_fp32 = True
 
     def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
         return self.mha.allocate_inference_cache(batch_size, max_seqlen, dtype=dtype, **kwargs)
     
     def forward(self, hidden_states: Tensor, position_ids = None, *args, **kwargs):
+        dtype = hidden_states.dtype
         inference_params = kwargs.pop("inference_params", None)
         cu_seqlens = kwargs.pop("cu_seqlens", None)
         max_seqlen = kwargs.pop("max_seqlen", None)
-        # attention_mask = kwargs.pop("attention_mask", None)
 
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
         if cu_seqlens is None:
             hidden_states = self.mha(hidden_states, inference_params=inference_params)
         else:
-            hidden_states = self.mha(hidden_states.squeeze(), cu_seqlens=cu_seqlens, max_seqlen=max_seqlen, inference_params=inference_params)
+            hidden_states = self.mha(hidden_states.squeeze(0), cu_seqlens=cu_seqlens, max_seqlen=max_seqlen, inference_params=inference_params)
             hidden_states = hidden_states.unsqueeze(0)
         hidden_states = residual + hidden_states
 
@@ -74,7 +72,7 @@ class MHADecoderLayer(nn.Module):
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
-        
+
         if inference_params is None:
             return (hidden_states, None, None)
         else:
@@ -104,24 +102,20 @@ class MambaDecoderLayer(nn.Module):
     def forward(self, hidden_states: Tensor, position_ids = None, *args, **kwargs):
         inference_params = kwargs.pop("inference_params", None)
         cu_seqlens = kwargs.pop("cu_seqlens", None)
-        # attention_mask = kwargs.pop("attention_mask", None)
-        
+        seq_idx = kwargs.pop("seq_idx", None)
+
         residual = hidden_states
-        hidden_states = self.input_layernorm(hidden_states)
-        
-        if cu_seqlens is None:
-            hidden_states = self.mamba(hidden_states, inference_params=inference_params)
-        else:
-            hidden_states = self.mamba(hidden_states, position_ids=position_ids, inference_params=inference_params)
-        
+        hidden_states = self.input_layernorm(residual)
+        hidden_states = self.mamba(hidden_states, position_ids=position_ids, cu_seqlens=cu_seqlens, seq_idx=seq_idx, inference_params=inference_params)
         hidden_states = residual + hidden_states
 
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
-
+        
         if inference_params is None:
             return (hidden_states, None, None)
         else:
             return hidden_states
+    
