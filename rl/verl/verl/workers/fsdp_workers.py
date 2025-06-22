@@ -208,16 +208,15 @@ class ActorRolloutRefWorker(Worker):
         with init_context(), warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
-            print("self.config.model.mamba:", self.config.model.mamba)
             if self.config.model.mamba:
                 # use mamba model here
                 # this is for training, you need to install packed mamba to train
                 from verl.models.mamba.hybrid_wrapper import MambaTransformerHybridModelWrapper
-                actor_module = MambaTransformerHybridModelWrapper.from_pretrained(pretrained_model_name=local_path, torch_dtype=torch.bfloat16)
+                actor_module = MambaTransformerHybridModelWrapper.from_pretrained(pretrained_model_name=local_path, torch_dtype=torch_dtype)
             elif self.config.model.mamba_inference:
                 # this is only for inference, you can use official mamba without packing support if you only want to do evaluation
                 from verl.models.mamba_inference.hybrid_wrapper import MambaTransformerHybridModelWrapper
-                actor_module = MambaTransformerHybridModelWrapper.from_pretrained(pretrained_model_name=local_path, torch_dtype=torch.bfloat16)   
+                actor_module = MambaTransformerHybridModelWrapper.from_pretrained(pretrained_model_name=local_path, torch_dtype=torch_dtype)   
             elif type(actor_model_config) in AutoModelForVision2Seq._model_mapping.keys():
                 actor_module_class = AutoModelForVision2Seq
                 actor_module = actor_module_class.from_pretrained(pretrained_model_name_or_path=local_path,
