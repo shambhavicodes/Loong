@@ -1,22 +1,22 @@
+
+# Copyright (c) 2023, Albert Gu, Tri Dao.
 import os
 import json
 
 import torch
 import torch.nn as nn
 
+from mamba2._generation import GenerationMixin
+
 from transformers import AutoModelForCausalLM
 
 from mamba_ssm.utils.hf import load_config_hf
 from transformers.utils.hub import cached_file
 
-from mamba.hybrid_mamba_config import MambaConfig
-from mamba.hybrid_model import MambaDecoderLayer, MHADecoderLayer
-from mamba.util import load_safetensors_to_dict, load_state_dict_hf
-from mamba._generation import GenerationMixin
-
+from mamba2.hybrid_mamba_config import MambaConfig
+from mamba2.hybrid_model import MambaDecoderLayer, MHADecoderLayer
+from mamba2.util import load_state_dict_hf, load_safetensors_to_dict
 from collections import namedtuple
-
-MAMBA_CONFIG_NAME = "mamba_config.json"
 
 
 def prepare_fa2_from_position_ids(position_ids):
@@ -30,6 +30,41 @@ def prepare_fa2_from_position_ids(position_ids):
     )
     max_length = (position_flatten_ids.max() + 1).item()
     return cu_seq_lens, max_length
+
+
+def merge_projections_for_layers(checkpoint, layer_indices):
+    for layer_idx in layer_indices:
+        # Get the weights for q_proj, k_proj, and v_proj
+        q_proj_key = f"model.layers.{layer_idx}.self_attn.q_proj.weight"
+        k_proj_key = f"model.layers.{layer_idx}.self_attn.k_proj.weight"
+        v_proj_key = f"model.layers.{layer_idx}.self_attn.v_proj.weight"
+        o_proj_key = f"model.layers.{layer_idx}.self_attn.o_proj.weight"
+
+        # Check if the keys exist in the checkpoint
+        if q_proj_key in checkpoint and k_proj_key in checkpoint and v_proj_key in checkpoint:
+            # Assuming all the projections have the same shape, otherwise adjust accordingly
+            q_proj_weight = checkpoint[q_proj_key]
+            k_proj_weight = checkpoint[k_proj_key]
+            v_proj_weight = checkpoint[v_proj_key]
+
+            # Concatenate the weights along the first dimension (often dimension 0)
+            in_proj_weight = torch.cat([q_proj_weight, k_proj_weight, v_proj_weight], dim=0)
+
+            # Assign the new weight to the corresponding in_proj key
+            in_proj_key = f"model.layers.{layer_idx}.mha.in_proj.weight"
+            checkpoint[in_proj_key] = in_proj_weight
+
+            # Optionally, remove the old keys to clean up the checkpoint
+            del checkpoint[q_proj_key]
+            del checkpoint[k_proj_key]
+            del checkpoint[v_proj_key]
+
+        if o_proj_key in checkpoint:
+            out_proj_key = f"model.layers.{layer_idx}.mha.out_proj.weight"
+            checkpoint[out_proj_key] = checkpoint[o_proj_key]
+            del checkpoint[o_proj_key]
+
+    return checkpoint
 
 
 def unpad_input_ids(input_ids: torch.LongTensor, attention_mask: torch.Tensor):
@@ -53,85 +88,18 @@ def get_last_n_states(hidden: torch.Tensor, cu_seqlens: torch.LongTensor, num_la
     return hidden_flat[last_indices]
 
 
-# def merge_mamba_projections_for_layers(checkpoint, layer_indices):
-#     for layer_idx in layer_indices:     
-#         z_proj_key = f"model.layers.{layer_idx}.mamba.in_proj_z.weight"
-#         x_proj_key = f"model.layers.{layer_idx}.mamba.in_proj_x.weight"
-#         b_proj_key = f"model.layers.{layer_idx}.mamba.B_proj.weight"
-#         c_proj_key = f"model.layers.{layer_idx}.mamba.C_proj.weight"
-#         dt_proj_key = f"model.layers.{layer_idx}.mamba.dt_proj_down.weight"
-#         if z_proj_key in checkpoint and x_proj_key in checkpoint and b_proj_key in checkpoint and c_proj_key in checkpoint and dt_proj_key in checkpoint:
-#             # Assuming all the projections have the same shape, otherwise adjust accordingly
-#             z_proj_weight = checkpoint[z_proj_key]
-#             x_proj_weight = checkpoint[x_proj_key]
-#             b_proj_weight = checkpoint[b_proj_key]
-#             c_proj_weight = checkpoint[c_proj_key]
-#             dt_proj_weight = checkpoint[dt_proj_key]
-#             # zxbcdt
-#             # Concatenate the weights along the first dimension (often dimension 0)
-#             in_proj_weight = torch.cat([z_proj_weight, x_proj_weight, b_proj_weight, c_proj_weight, dt_proj_weight], dim=0)
-#             # Assign the new weight to the corresponding in_proj key
-#             in_proj_key = f"model.layers.{layer_idx}.mamba.in_proj.weight"
-#             checkpoint[in_proj_key] = in_proj_weight
-#             # Optionally, remove the old keys to clean up the checkpoint
-#             del checkpoint[z_proj_key]
-#             del checkpoint[x_proj_key]
-#             del checkpoint[b_proj_key]
-#             del checkpoint[c_proj_key]
-#             del checkpoint[dt_proj_key] 
-#     return checkpoint
-
-
-# def merge_mha_projections_for_layers(checkpoint, layer_indices):
-#     for layer_idx in layer_indices:
-#         # Get the weights for q_proj, k_proj, and v_proj
-#         q_proj_key = f"model.layers.{layer_idx}.self_attn.q_proj.weight"
-#         k_proj_key = f"model.layers.{layer_idx}.self_attn.k_proj.weight"
-#         v_proj_key = f"model.layers.{layer_idx}.self_attn.v_proj.weight"
-#         o_proj_key = f"model.layers.{layer_idx}.self_attn.o_proj.weight"
-#         # Check if the keys exist in the checkpoint
-#         if q_proj_key in checkpoint and k_proj_key in checkpoint and v_proj_key in checkpoint:
-#             # Assuming all the projections have the same shape, otherwise adjust accordingly
-#             q_proj_weight = checkpoint[q_proj_key]
-#             k_proj_weight = checkpoint[k_proj_key]
-#             v_proj_weight = checkpoint[v_proj_key]
-#             # Concatenate the weights along the first dimension (often dimension 0)
-#             in_proj_weight = torch.cat([q_proj_weight, k_proj_weight, v_proj_weight], dim=0)
-#             # Assign the new weight to the corresponding in_proj key
-#             in_proj_key = f"model.layers.{layer_idx}.mha.in_proj.weight"
-#             checkpoint[in_proj_key] = in_proj_weight
-#             # Optionally, remove the old keys to clean up the checkpoint
-#             del checkpoint[q_proj_key]
-#             del checkpoint[k_proj_key]
-#             del checkpoint[v_proj_key]
-#         if o_proj_key in checkpoint:
-#             out_proj_key = f"model.layers.{layer_idx}.mha.out_proj.weight"
-#             checkpoint[out_proj_key] = checkpoint[o_proj_key]
-#             del checkpoint[o_proj_key]
-#     return checkpoint
-
+MAMBA_CONFIG_NAME = "mamba_config.json"
 
 class MambaTransformerHybridModelWrapper(nn.Module, GenerationMixin):
-    def __init__(
-        self,
-        checkpoint_path,
-        transformer_model,
-        mamba_config,
-        attn_layers,
-        dtype,
-        load_from_hub=False,
-        **kwargs,
-    ):
+
+    def __init__(self, checkpoint_path, transformer_model, mamba_config, attn_layers, dtype, load_from_hub=False, **kwargs):
         super(MambaTransformerHybridModelWrapper, self).__init__()
         self.mamba_config = mamba_config
         self.attn_layers = attn_layers
-        self.ssm_layers = [
-            layer_idx
-            for layer_idx in range(mamba_config.n_layer)
-            if layer_idx not in attn_layers
-        ]
+        self.ssm_layers = [i for i in range(mamba_config.n_layer) if i not in attn_layers]
         self.model = transformer_model
         self.config = self.model.config
+        
         for layer_idx in range(mamba_config.n_layer):
             if layer_idx in attn_layers:
                 layer_encoder = MHADecoderLayer(
@@ -148,47 +116,34 @@ class MambaTransformerHybridModelWrapper(nn.Module, GenerationMixin):
                     dtype=dtype,
                 )
             self.model.model.layers[layer_idx] = layer_encoder
-
+            
+        print("self.model:", self.model)      
+           
         if checkpoint_path is not None:
             if load_from_hub:
                 # load from a huggingface hub
-                ckpt = load_state_dict_hf(
-                    checkpoint_path, device=torch.device("cpu"), dtype=dtype
-                )
+                ckpt = load_state_dict_hf(checkpoint_path, device=torch.device("cpu"), dtype=dtype)
             else:
                 # load from a local directory
                 if os.path.exists(f"{checkpoint_path}/pytorch_model.bin"):
                     # support save from bin file
-                    ckpt = torch.load(
-                        f"{checkpoint_path}/pytorch_model.bin",
-                        map_location=torch.device("cpu"),
-                    )
+                    ckpt = torch.load(f"{checkpoint_path}/pytorch_model.bin", map_location=torch.device("cpu"))
                 else:
                     # support save from safetensors
                     ckpt = load_safetensors_to_dict(checkpoint_path)
-
-            if self.config.tie_word_embeddings:
-                ckpt["lm_head.weight"] = ckpt["model.embed_tokens.weight"]
-            
-            # if you use old checkpoint, you might need to do this.
-            # merge_mha_projections_for_layers(ckpt, self.attn_layers)
-            # merge_mamba_projections_for_layers(ckpt, self.ssm_layers)
-
+        
+            merge_projections_for_layers(ckpt, self.attn_layers)
             self.model.load_state_dict(ckpt)
 
+        self.model = self.model.to(dtype).cuda()
         self.device = self.model.device
         self.dtype = dtype
 
     def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
         return {
-            i: layer.allocate_inference_cache(
-                batch_size, max_seqlen, dtype=dtype, **kwargs
-            )
+            i: layer.allocate_inference_cache(batch_size, max_seqlen, dtype=dtype, **kwargs)
             for i, layer in enumerate(self.model.model.layers)
         }
-
-    def gradient_checkpointing_enable(self, *args, **kwargs):
-        return self.model.gradient_checkpointing_enable(*args, **kwargs)
 
     def forward(
         self,
@@ -220,15 +175,18 @@ class MambaTransformerHybridModelWrapper(nn.Module, GenerationMixin):
         else:
 
             cu_seqlens = None
-            if inference_params.seqlen_offset == 0 and self.pad_token_id is not None:
-                # prefill for batch generation
+            if inference_params.seqlen_offset == 0:
+                # prefill
                 attention_mask = (input_ids != self.pad_token_id)
                 input_ids, position_ids, cu_seqlens, max_seqlen = unpad_input_ids(input_ids, attention_mask)
+                seq_idx = torch.cat([torch.full((s,), i, dtype=torch.int32, device=cu_seqlens.device) 
+                        for i, s in enumerate(cu_seqlens[1:]-cu_seqlens[:-1])], dim=0).unsqueeze(0)
                 mixer_kwargs.update({
                     "cu_seqlens": cu_seqlens,
                     "max_seqlen": max_seqlen,
+                    "seq_idx": seq_idx,
                 })
-            
+
             # this if for inference
             hidden_states = self.model.model.embed_tokens(input_ids)
 
@@ -239,7 +197,8 @@ class MambaTransformerHybridModelWrapper(nn.Module, GenerationMixin):
             
             hidden_states = self.model.model.norm(hidden_states)
             if inference_params.seqlen_offset == 0 and cu_seqlens is not None:
-                # variable length inference, prefill
+                # variable length 
+                # inference, prefill
                 hidden_states = get_last_n_states(hidden_states, cu_seqlens, num_last_tokens)
                 if inference_params.lengths_per_sample is None:
                     inference_params.lengths_per_sample = torch.full(
@@ -247,7 +206,7 @@ class MambaTransformerHybridModelWrapper(nn.Module, GenerationMixin):
                     )
                 inference_params.lengths_per_sample += attention_mask.sum(-1)
             else:
-                # regular default path, default mamba
+                # regular default path
                 if num_last_tokens > 0:
                     hidden_states = hidden_states[:, -num_last_tokens:]
 

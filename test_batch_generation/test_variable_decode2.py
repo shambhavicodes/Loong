@@ -1,6 +1,6 @@
 import torch
-from mamba.hybrid_wrapper import MambaTransformerHybridModelWrapper
-from mamba._generation import InferenceParams
+from mamba2.hybrid_wrapper import MambaTransformerHybridModelWrapper
+from mamba2._generation import InferenceParams
 from transformers import AutoTokenizer
 
 import random
@@ -14,7 +14,7 @@ xs = [torch.randint(1, 128000, (1, seqlen), device="cuda", dtype=torch.long) for
 
 tensor_type = torch.float16
 
-model_name = "togethercomputer/M1-3B"
+model_name = "JunxiongWang/Llama3.2-Mamba2-3B-distill"
 model = MambaTransformerHybridModelWrapper.from_pretrained(
     model_name, torch_dtype=tensor_type
 ).cuda().eval()
