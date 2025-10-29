@@ -1,0 +1,7 @@
+type: "vllm"
+args:
+  api_name: "tulu3-hybrid-ssm50-50"
+  api_key: "EMPTY"
+  api_url: "http://localhost:8000/v1"
+run_args:
+  temperature: 0.0

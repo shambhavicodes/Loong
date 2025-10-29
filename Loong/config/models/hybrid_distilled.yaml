@@ -1,0 +1,6 @@
+type: "hybrid"
+args:
+  model_path: "/home/toolkit/M1/outputs/tulu3_distill_hybrid_ssm50-50_8gpu"
+run_args:
+  temperature: 0.0
+  top_p: 1.0

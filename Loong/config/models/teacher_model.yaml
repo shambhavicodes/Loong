@@ -1,0 +1,7 @@
+type: "vllm"
+args:
+  api_name: "Llama-3.2-3B-Instruct"
+  api_key: "EMPTY"
+  api_url: "http://localhost:8002/v1"
+run_args:
+  temperature: 0.0
